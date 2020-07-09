@@ -18,12 +18,14 @@
 
 # TWRP extract location for data/data/
 localpackages='data/data/'
-# Android delivery destination
+# Android temp destination
+temppackages='/data/tmp/'
+# Android final destination
 remotepackages='/data/data/'
 
-# filename of packages in data/data/ to restore
+# filename of packages in data/data/ to restore (one by line and between double quotes)
 declare -a packages=(
-"io.getdelta.android" 
+"io.getdelta.android"
 "ca.mogo.mobile"
 "au.com.shiftyjelly.pocketcasts"
 "com.valvesoftware.android.steam.community"
@@ -37,28 +39,44 @@ declare -a packages=(
 "com.americanexpress.android.acctsvcs.ca"
 "com.amazon.venezia"
 )
+# Get total number of packages to restore
+len=${#packages[@]}
 
 printf "=========================================================\n"
-printf "Killing ADB server\n"
-adb kill-server
-printf "Starting ADB server with sudo\n"
-sudo adb start-server
 printf "Starting ADB as root\n"
 adb root
 printf "=========================================================\n"
 
+# Init counters
+# n = Number of actual package to restore
+# g = Number of app data successfully restored
+n=0
+g=0
 
 for package in ${packages[*]}
 do
-    printf "=========================================================\n"
-    printf "Restoring %s\n" $package
-    adb push $localpackages$package $remotepackages$package
-    printf "Correcting package\n"
-    userid=$(adb shell dumpsys package $package | grep userId | cut -d "=" -f2-)
-    adb shell chown -R $userid:$userid $remotepackages$package
-    adb shell restorecon -Rv $remotepackages$package
-    printf "Package restored on device\n"
-    sleep 1
-    
+	n=$((n + 1))
+	printf "=========================================================\n\n"
+	printf "|***| Starting process for \"%s\" package (%s of %s)\n\n" "$package" "$n" "$len"
+	printf "[1/4] Checking device...\n"
+	userid=$(adb shell su -c "dumpsys package $package | grep userId | cut -d '=' -f2-")
+	if [[ $userid =~ ^[0-9]+$ ]] ; then
+		printf "[INFO] User ID is %s\n" "$userid"
+		printf "[2/4] Restoring data...\n"
+		adb push "$localpackages$package" "$temppackages$package"
+		adb shell su -c "cp -r $temppackages$package $remotepackages"
+		adb shell su -c "chown -R $userid:$userid $remotepackages$package"
+		adb shell su -c "restorecon -Rv $remotepackages$package"
+		g=$((g + 1))
+	else
+		printf "[2/4] ERROR: App not found/installed! Can't restore...\n"
+	fi	
+	printf "[3/4] Cleaning...\n"
+	adb shell rm -rf "$temppackages$package"
+	printf "[4/4] Done!\n\n"
+	sleep 1
 done
 
+printf "=========================================================\n"
+printf "      SUMMARY: %s / %s SUCCESSFULLY RESTORED\n" "$g" "$len"
+printf "=========================================================\n"
