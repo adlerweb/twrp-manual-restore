@@ -19,11 +19,10 @@ printf "=========================================================\n\n"
 # https://www.semipol.de/2016/07/30/android-restoring-apps-from-twrp-backup.html
 # https://itsfoss.com/fix-error-insufficient-permissions-device/
 
-#							#
-##						   ##
+
+##                         ##
 #### BEGIN CONFIGURATION ####
-##						   ##
-#							#
+##                         ##
 
 # TWRP extract location for data/data/
 localpackages='data/data/'
@@ -34,14 +33,25 @@ remotepackages='/data/data/'
 
 # filename of packages in data/data/ to restore (one by line and between double quotes)
 declare -a packages=(
-"balti.migrate"
+"io.getdelta.android"
+"ca.mogo.mobile"
+"au.com.shiftyjelly.pocketcasts"
+"com.valvesoftware.android.steam.community"
+"com.ubercab"
+"de.stocard.stocard"
+"com.wealthsimple"
+"com.calm.android"
+"com.coinomi.wallet"
+"com.aspiro.tidal"
+"com.appgenix.bizcal"
+"com.americanexpress.android.acctsvcs.ca"
+"com.amazon.venezia"
 )
 
-#							#
-##						   ##
-####  END CONFIGURATION #####
-##						   ##
-#							#
+##                         ##
+#### END CONFIGURATION ######
+##                         ##
+
 
 printf "=========================================================\n\n"
 printf "Executing 'adb root' command:\n\n"
