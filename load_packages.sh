@@ -19,10 +19,11 @@ printf "=========================================================\n\n"
 # https://www.semipol.de/2016/07/30/android-restoring-apps-from-twrp-backup.html
 # https://itsfoss.com/fix-error-insufficient-permissions-device/
 
-
+#                           #
 ##                         ##
 #### BEGIN CONFIGURATION ####
 ##                         ##
+#                           #
 
 # TWRP extract location for data/data/
 localpackages='data/data/'
@@ -48,32 +49,34 @@ declare -a packages=(
 "com.amazon.venezia"
 )
 
+#                           #
 ##                         ##
-#### END CONFIGURATION ######
+####  END CONFIGURATION #####
 ##                         ##
-
+#                           #
 
 printf "=========================================================\n\n"
 printf "Executing 'adb root' command:\n\n"
 adb root
 printf "\n"
-id=$(adb shell id -u)
-uid=$id
+# c = adb command to use
+c="adb shell"
+id=$($c id -u)
 if [[ $id != "0" ]] ; then
-	id=$(adb shell su -c "id -u")
-	if [ -z "$id" ] ; then
-		id=$uid
+	printf "[INFO] 'adb root' command failed. Trying with Magisk (if installed).\n\n"
+	c="$c su -c"
+	id=$($c id -u)
+	if [[ $id != "0" ]] ; then
+		printf "\n[ERROR] Didn't get root permissions! Can't restore.\n\n"
+		printf "[INFO] You can chose one of the following two ways to be able to restore:\n\n"
+		printf " - Install a modded adbd version on your device\n"
+		printf " - Install 'Stable' Magisk version and allow root access for \"Shell\" package\n\n"
+		printf "=========================================================\n\n"
+		exit
 	fi
 fi
-printf "\n[INFO] User ID of adb is '%s' (must be '0').\n\n" "$id"
-if [[ $id != "0" ]] ; then
-	printf "[ERROR] Didn't get root permissions! Can't restore.\n\n"
-	printf "[INFO] You can chose one of this two ways to be able to restore:\n\n- Install a modified adbd\n- Install Magisk and allow root for 'Shell' package\n\n"
-	printf "=========================================================\n\n"
-	exit
-else
-	printf "=========================================================\n\n"
-fi
+printf "[INFO] Successfully got root permissions! Continue...\n\n"
+printf "=========================================================\n\n"
 
 # get total number of packages to restore
 len=$(printf '%s\n' "${packages[@]}" | wc -w)
@@ -84,6 +87,9 @@ len=$(printf '%s\n' "${packages[@]}" | wc -w)
 n=0
 g=0
 
+# init list of not restored packages
+l=()
+
 for package in ${packages[*]}
 do
 	n=$((n + 1))
@@ -93,31 +99,44 @@ do
 		printf "[WARN] Can't find this filename of package (%s).\n\n" "$localpackages$package"
 		continue
 	fi
-	printf "[***] Checking device...\n"
-	userid=$(adb shell dumpsys package "$package" | grep userId | cut -d '=' -f2-)
+	# remove 'lib' symbolic link in root of package if exist
+	rm -f "$localpackages$package/lib"
+	printf "[***] Checking device...\n\n"
+	userid=$($c dumpsys package "$package" | grep userId | cut -d '=' -f2-)
 	if [[ ! $userid =~ ^[0-9]+$ ]] ; then
-		userid=$(adb shell su -c "stat -c %u '$remotepackages$package'")
+		userid=$($c stat -c %u "$remotepackages$package")
 	fi
 	if [[ $userid =~ ^[0-9]+$ ]] ; then
-		printf "\n[INFO] User ID of this app is '%s'.\n\n" "$userid"
+		#printf "[INFO] User ID of this app is '%s'.\n\n" "$userid"
 		printf "[1/5] Pushing package to temp dir...\n"
 		adb push "$localpackages$package" "$temppackages$package"
 		printf "[2/5] Restoring package...\n"
-		adb shell su -c "cp -r '$temppackages$package' '$remotepackages'"
+		$c cp -r "$temppackages$package" "$remotepackages"
 		printf "[3/5] Correcting package...\n"
-		adb shell su -c "chown -R $userid:$userid '$remotepackages$package'"
-		adb shell su -c "restorecon -R '$remotepackages$package'"
+		$c chown -R "$userid":"$userid" "$remotepackages$package"
+		$c restorecon -R "$remotepackages$package"
 		printf "[4/5] Cleaning temp dir...\n"
-		adb shell su -c "rm -rf '$temppackages$package'"
+		$c rm -rf "$temppackages$package"
 		printf "[5/5] Done!\n\n"
 		g=$((g + 1))
 		sleep 1
 	else
-		printf "\n[WARN] Can't read user ID info of this app. Can't restore.\n"
+		l+=("$package")
+		printf "[WARN] Can't read user ID info of this app. Can't restore.\n"
 		printf "[INFO] App must be installed on your device to be able to restore package.\n\n"
 	fi
 done
 
+# f = number of not restored packages
+f=$((len - g))
+
 printf "=========================================================\n\n"
-printf "      SUMMARY: %s / %s SUCCESSFULLY RESTORED\n\n" "$g" "$len"
-printf "=========================================================\n\n"
+printf "      SUMMARY: %s / %s SUCCESSFULLY RESTORED" "$g" "$len"
+if [[ $f != "0" ]] ; then
+	printf "\n\n           --- NOT RESTORED LIST ---\n"
+	for package in ${l[*]}
+	do
+		printf "\n - %s" "$package"
+	done
+fi
+printf "\n\n=========================================================\n\n"
