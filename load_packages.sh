@@ -97,7 +97,7 @@ do
 	userid=$($c dumpsys package "$package" | grep userId | cut -d '=' -f2-)
 	if [[ ! $userid =~ ^[0-9]+$ ]] ; then
 		printf "[0/5] Installing missing application...\n"
-		apkpath=$(find . -maxdepth 4 -type d -print | grep "$package" | head -n1)
+		apkpath=$(find "$localapkpath" -maxdepth 4 -type d -print | grep "$package" | head -n1)
 		if [ ! -f "$apkpath/base.apk" ] ; then
 			printf "[WARN] Application is not installed and apk not found for (%s).\n\n" "$package"
 			continue
